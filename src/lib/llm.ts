@@ -21,8 +21,21 @@ const SYSTEM = [
   'Formato: responda com seções claras e bullets quando útil.',
 ].join(' ')
 
+// Tipagens mínimas para compatibilidade entre versões do SDK
+type ChatMessage =
+  | { role: 'system'; content: string }
+  | { role: 'user'; content: string }
+
+type ChatCompletionChoice = {
+  delta?: { content?: string }
+  message?: { content?: string }
+}
+
+type ChatStreamChunk = { choices?: ChatCompletionChoice[] }
+type ChatCompletionResult = { choices?: ChatCompletionChoice[] }
+
 // Mensagens da conversa
-function buildMessages(prompt: string, ctx: Ctx = {}) {
+function buildMessages(prompt: string, ctx: Ctx = {}): ChatMessage[] {
   const { transcripts = [] } = ctx
   const userParts: string[] = [`Pergunta: ${prompt}`]
   if (transcripts.length) {
@@ -32,8 +45,8 @@ function buildMessages(prompt: string, ctx: Ctx = {}) {
     )
   }
   return [
-    { role: 'system' as const, content: SYSTEM },
-    { role: 'user' as const, content: userParts.join('\n\n') },
+    { role: 'system', content: SYSTEM },
+    { role: 'user', content: userParts.join('\n\n') },
   ]
 }
 
@@ -43,17 +56,15 @@ function getModel(ctx?: Ctx) {
 
 // Promise timeout utilitário (evita pendurar requests)
 async function withTimeout<T>(p: Promise<T>, ms = REQ_TIMEOUT_MS): Promise<T> {
-  let timer: NodeJS.Timeout
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, rej) => {
+    timer = setTimeout(() => rej(new Error('timeout')), ms)
+  })
   try {
-    const race = await Promise.race([
-      p,
-      new Promise<never>((_, rej) => (timer = setTimeout(() => rej(new Error('timeout')), ms))),
-    ])
-    // @ts-ignore — timer é definido acima antes de resolver
-    clearTimeout(timer)
-    return race as T
+    const result = (await Promise.race([p, timeout])) as T
+    if (timer) clearTimeout(timer)
+    return result
   } catch (e) {
-    // @ts-ignore
     if (timer) clearTimeout(timer)
     throw e
   }
@@ -63,30 +74,33 @@ async function withTimeout<T>(p: Promise<T>, ms = REQ_TIMEOUT_MS): Promise<T> {
  * Streaming: gera a resposta em pedaços (como o ChatGPT).
  * Use no /api/ask?stream=1. Cada yield é um delta de texto.
  */
-export async function* generateStream(prompt: string, ctx: Ctx = {}) {
+export async function* generateStream(
+  prompt: string,
+  ctx: Ctx = {}
+): AsyncGenerator<string, void, unknown> {
   // Fallback sem chave (não quebra dev)
   if (!process.env.OPENAI_API_KEY) {
     const demo = `🔎 (DEMO) Você perguntou: "${prompt}". Configure OPENAI_API_KEY para ativar respostas reais.`
     const chunks = demo.match(/.{1,12}/g) ?? [demo]
     for (const c of chunks) {
-      await new Promise(r => setTimeout(r, 60))
+      await new Promise((r) => setTimeout(r, 60))
       yield c
     }
     return
   }
 
   // Cria o stream com timeout na fase de criação
-  const stream = await withTimeout(
+  const stream = (await withTimeout(
     openai.chat.completions.create({
       model: getModel(ctx),
       temperature: 0.2,
       stream: true,
       messages: buildMessages(prompt, ctx),
     })
-  )
+  )) as unknown as AsyncIterable<ChatStreamChunk>
 
   // Watchdog de inatividade por chunk (reinicia a cada delta)
-  let chunkTimer: NodeJS.Timeout | null = null
+  let chunkTimer: ReturnType<typeof setTimeout> | null = null
   const resetChunkTimer = () => {
     if (chunkTimer) clearTimeout(chunkTimer)
     chunkTimer = setTimeout(() => {
@@ -96,8 +110,8 @@ export async function* generateStream(prompt: string, ctx: Ctx = {}) {
   resetChunkTimer()
 
   try {
-    for await (const part of stream as any) {
-      const delta = part?.choices?.[0]?.delta?.content as string | undefined
+    for await (const part of stream) {
+      const delta = part?.choices?.[0]?.delta?.content
       if (delta) {
         resetChunkTimer()
         yield delta
@@ -112,7 +126,10 @@ export async function* generateStream(prompt: string, ctx: Ctx = {}) {
  * Completa de uma vez (sem streaming).
  * Use quando /api/ask for chamado sem ?stream=1.
  */
-export async function generateFull(prompt: string, ctx: Ctx = {}): Promise<string> {
+export async function generateFull(
+  prompt: string,
+  ctx: Ctx = {}
+): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
     const hint = ctx.transcripts?.length
       ? `\n\n(Recebi ${ctx.transcripts.length} transcrição(ões).)`
@@ -120,16 +137,15 @@ export async function generateFull(prompt: string, ctx: Ctx = {}): Promise<strin
     return `🔎 (DEMO) Você perguntou: "${prompt}". Configure OPENAI_API_KEY para ativar respostas reais.${hint}`
   }
 
-  const completion = await withTimeout(
+  const completion = (await withTimeout(
     openai.chat.completions.create({
       model: getModel(ctx),
       temperature: 0.2,
       messages: buildMessages(prompt, ctx),
     })
-  )
+  )) as unknown as ChatCompletionResult
 
   return (
-    // @ts-ignore — tipos do SDK podem variar por versão
     completion?.choices?.[0]?.message?.content?.trim() ||
     'Não consegui gerar a resposta no momento.'
   )

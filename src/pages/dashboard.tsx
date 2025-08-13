@@ -132,7 +132,7 @@ const Topbar = memo(function Topbar({
   )
 })
 
-export default function Dashboard({ userEmail, userName: _userName, isVerified, queries }: Props) {
+export default function Dashboard({ userEmail, isVerified, queries }: Props) {
   const router = useRouter()
   const bootSent = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
@@ -427,9 +427,13 @@ export default function Dashboard({ userEmail, userName: _userName, isVerified, 
         t.focus()
       }
       void handleSend(p)
-      const { prompt, ...rest } = router.query
+
+      // remove `prompt` da URL sem criar variável não utilizada
+      const rest: Record<string, any> = { ...router.query }
+      delete rest.prompt
       router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query, handleSend, router])
 
   // Novo chat

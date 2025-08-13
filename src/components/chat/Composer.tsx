@@ -52,7 +52,6 @@ export default function Composer({
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const [recStartedAt, setRecStartedAt] = useState<number | null>(null)
-  const [recTick, setRecTick] = useState(0)
   const [isComposing, setIsComposing] = useState(false)
 
   // auto-resize do textarea
@@ -145,11 +144,6 @@ export default function Composer({
     }
   }
 
-  useEffect(() => {
-    if (!recording || !recStartedAt) return;
-    const id = setInterval(() => setRecTick(t => t + 1), 500);
-    return () => clearInterval(id);
-  }, [recording, recStartedAt]);
 
   // cleanup on unmount (stop recording and tracks if any)
   useEffect(() => {

@@ -9,14 +9,18 @@ const openai = new OpenAI({
 
 const REQ_TIMEOUT_MS = 60_000 // 60s
 
-// AbortController com timeout
-function makeTimeoutSignal(ms = REQ_TIMEOUT_MS) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), ms)
-  return {
-    signal: ctrl.signal,
-    clear: () => clearTimeout(timer),
-  }
+// Timeout helper (Promise.race) — sem passar `signal` pro SDK (evita erro de type)
+function withTimeout<T>(p: Promise<T>, ms = REQ_TIMEOUT_MS): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('ASR_TIMEOUT')), ms)
+    p.then((v) => {
+      clearTimeout(timer)
+      resolve(v)
+    }).catch((err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+  })
 }
 
 /**
@@ -28,34 +32,33 @@ function makeTimeoutSignal(ms = REQ_TIMEOUT_MS) {
 export async function transcribeOne(filePath: string): Promise<string> {
   if (!process.env.OPENAI_API_KEY) return ''
   let stream: fs.ReadStream | null = null
-  const { signal, clear } = makeTimeoutSignal()
   try {
     // Garante que o arquivo existe
     if (!fs.existsSync(filePath)) return ''
     stream = fs.createReadStream(filePath)
 
-    const resp = await openai.audio.transcriptions.create(
-      {
+    const resp = await withTimeout(
+      openai.audio.transcriptions.create({
         model: 'whisper-1',
         file: stream as any, // SDK aceita ReadStream
         language: 'pt',
         response_format: 'text',
         temperature: 0,
-      },
-      { signal }
+      }),
+      REQ_TIMEOUT_MS
     )
 
     if (typeof resp === 'string') return resp.trim()
-    // alguns SDKs retornam objeto { text }
-    // @ts-ignore
-    return (resp?.text ?? '').toString().trim()
+    if (resp && typeof (resp as any).text === 'string') {
+      return String((resp as any).text).trim()
+    }
+    return ''
   } catch (e) {
     console.error('ASR error:', e)
     return ''
   } finally {
     try { stream?.close() } catch {}
     try { fs.unlinkSync(filePath) } catch {}
-    clear()
   }
 }
 
