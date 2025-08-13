@@ -66,4 +66,4 @@ A página `/voice` utiliza a API Web Speech para transcrever áudio (navegadores
 4. **Anúncios e monetização**: crie módulos e tabelas para anúncios segmentados (farmacêuticas, dispositivos médicos) e um painel administrativo.
 5. **Escalabilidade e deploy**: utilize serviços como Vercel, AWS ou GCP para hospedar a aplicação com certificados SSL e CDN.
 
-Este repositório é um ponto de partida.  Para chegar a um produto comparável ao OpenEvidence, será necessário adicionar verificação profissional, curadoria de conteúdo, integração com EHRs, mecanismos de publicidade e reforço de segurança (LGPD/HIPAA).
+Este repositório é um ponto de partida.  Para chegar a um produto comparável ao OpenEvidence, será necessário adicionar verificação profissional, curadoria de conteúdo, integração com EHRs, mecanismos de publicidade e reforço de segurança (LGPD/HIPAA).# aimnese
