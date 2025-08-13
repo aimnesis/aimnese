@@ -51,7 +51,6 @@ export default function Composer({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const [recStartedAt, setRecStartedAt] = useState<number | null>(null)
   const [isComposing, setIsComposing] = useState(false)
 
   // auto-resize do textarea
@@ -113,7 +112,6 @@ export default function Composer({
       try { mediaRecorderRef.current?.stop() } catch {}
       try { mediaStreamRef.current?.getTracks().forEach(t => t.stop()); mediaStreamRef.current = null } catch {}
       setRecording(false);
-      setRecStartedAt(null);
       return;
     }
     try {
@@ -133,12 +131,10 @@ export default function Composer({
             setFiles(prev => dedupeByName([...prev, file]).slice(0, MAX_FILES));
           }
         }
-        setRecStartedAt(null);
       };
       mediaRecorderRef.current = mr;
       mr.start();
       setRecording(true);
-      setRecStartedAt(Date.now());
     } catch {
       setErr('Permissão de microfone negada ou não suportado.');
     }

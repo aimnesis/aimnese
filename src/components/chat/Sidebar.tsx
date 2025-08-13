@@ -1,7 +1,9 @@
 // src/components/chat/Sidebar.tsx
+// src/components/chat/Sidebar.tsx
 'use client'
 
 import { memo, useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import { Search, Stethoscope, FileText, MessageSquare, Settings, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react'
 
 export type SidebarItem = {
@@ -147,7 +149,7 @@ function SidebarImpl({ items, userEmail, isVerified, activeId, onSelect, onNew }
     <aside className="h-full w-full flex flex-col" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
       {/* BRAND / TOPO */}
       <div className="px-4 pt-4 pb-2 flex items-center gap-3 select-none">
-        <img src="/logo-aimnesis.svg" alt="Aimnesis" width={24} height={24} className="opacity-90" />
+        <Image src="/logo.png" alt="Logo" width={100} height={100} />
         <div className="text-[15px] font-semibold tracking-tight">AIMNESIS</div>
       </div>
 
