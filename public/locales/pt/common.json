@@ -1,0 +1,14 @@
+{
+  "signup": {
+    "title": "Criar conta",
+    "email": "E-mail",
+    "password": "Senha",
+    "confirm": "Confirmar senha",
+    "submit": "Cadastrar",
+    "already": "Já tem conta?",
+    "login": "Entrar"
+  },
+  "home": {
+    "exploreMore": "Explorar mais funcionalidades"
+  }
+}

@@ -1,0 +1,27 @@
+cat > .gitignore <<'EOF'
+# Build / cache
+.next/
+out/
+dist/
+.cache/
+coverage/
+*.log
+
+# Packages
+node_modules/
+
+# Env
+.env
+.env.*
+!.env.template
+
+# OS / editors
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Vercel / Sentry
+.vercel/
+.sentryclirc
+EOF

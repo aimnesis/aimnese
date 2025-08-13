@@ -1,0 +1,43 @@
+{
+  "tagline": "AI-powered clinical evidence at your fingertips",
+  "searchPlaceholder": "Ask a medical question…",
+  "subtext": "Aimnesis is free for verified healthcare professionals and delivers evidence‑based answers with citations.",
+  "explore": "Explore more capabilities",
+  "trusted": "Trusted by clinicians worldwide",
+  "trustedDescription": "Aimnesis is inspired by the OpenEvidence platform and demonstrates how AI can revolutionize clinical decision support.",
+  "login": {
+    "title": "Log In",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Log In",
+    "notRegistered": "Not registered?",
+    "createAccount": "Create an account",
+    "invalid": "Invalid credentials"
+  },
+  "signup": {
+    "title": "Sign Up",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "confirm": "Confirm Password",
+    "submit": "Create Account",
+    "already": "Already have an account?",
+    "login": "Log in",
+    "passwordMismatch": "Passwords do not match",
+    "disabled": "Registration is disabled in this demo. Please contact the administrator to create an account."
+  },
+  "profile": {
+    "title": "Profile",
+    "save": "Save",
+    "saveDisabled": "Profile saving is not implemented in this demo."
+  },
+  "voice": {
+    "title": "Voice Assistant",
+    "record": "Start Recording",
+    "stop": "Stop Recording",
+    "sendQuestion": "Send Question",
+    "generateDoc": "Generate Document",
+    "notSupported": "Voice recognition is not supported in this browser.",
+    "transcript": "Transcript"
+  }
+}
