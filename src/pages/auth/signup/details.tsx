@@ -1,5 +1,5 @@
 // src/pages/auth/signup/details.tsx
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import specialties from '@/data/specialties.json'
 import { signIn } from 'next-auth/react'
