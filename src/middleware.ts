@@ -1,7 +1,7 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-const SUPPORTED = ['pt', 'en']
+const SUPPORTED = ['pt', 'en'] as const
 const DEFAULT = 'en'
 
 function countryToLocale(country: string | null): string {
@@ -24,26 +24,25 @@ function parseAcceptLanguage(header: string | null): string | null {
 
 export function middleware(req: NextRequest) {
   const cookieLocale = req.cookies.get('NEXT_LOCALE')?.value
-  if (cookieLocale && SUPPORTED.includes(cookieLocale)) return NextResponse.next()
+  if (cookieLocale && SUPPORTED.includes(cookieLocale as any)) return NextResponse.next()
 
   const countryHeader = req.headers.get('x-vercel-ip-country') || null
   let locale = countryToLocale(countryHeader)
 
-  if (!SUPPORTED.includes(locale)) {
+  if (!SUPPORTED.includes(locale as any)) {
     const accept = req.headers.get('accept-language')
     const fromHeader = parseAcceptLanguage(accept)
     if (fromHeader) locale = fromHeader
   }
 
   const res = NextResponse.next()
-  res.cookies.set('NEXT_LOCALE', SUPPORTED.includes(locale) ? locale : DEFAULT, {
+  res.cookies.set('NEXT_LOCALE', SUPPORTED.includes(locale as any) ? locale : DEFAULT, {
     path: '/',
     maxAge: 60 * 60 * 24 * 30,
   })
   return res
 }
 
-// exclui _next, assets, favicon, e também /api e /auth
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|api|auth).*)'],
 }

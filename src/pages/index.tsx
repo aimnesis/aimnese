@@ -85,8 +85,8 @@ export default function Home() {
       if (!text) return
       const target = `/dashboard?prompt=${encodeURIComponent(text)}`
       if (!session?.user) {
-        // manda para login e volta pro dashboard com a pergunta
-        router.push(`/auth/signin?callbackUrl=${encodeURIComponent(target)}`)
+        // manda direto para CADASTRO e preserva o callback para cair no Dashboard com a pergunta
+        router.push(`/auth/signup?callbackUrl=${encodeURIComponent(target)}`)
       } else {
         router.push(target)
       }
@@ -103,14 +103,16 @@ export default function Home() {
 
   const isTyping = query.length > 0
 
-  // Handlers superficiais dos chips (sem lógica pesada na Home)
-  const triggerAttach = () => attachRef.current?.click()
-  const onAttachChange = () => {
-    // Home é uma landing. Apenas foca o input e informa visualmente.
-    inputRef.current?.focus()
-  }
-  const focusSearch = () => inputRef.current?.focus()
-  const focusVoice = () => inputRef.current?.focus()
+  // Handlers dos chips — em produção, leve o usuário direto ao Dashboard ou Signup
+  const goSignupOrDash = useCallback(() => {
+    if (session?.user) router.push('/dashboard')
+    else router.push('/auth/signup')
+  }, [router, session?.user])
+
+  const triggerAttach = goSignupOrDash
+  const onAttachChange = goSignupOrDash
+  const focusSearch = goSignupOrDash
+  const focusVoice = goSignupOrDash
 
   return (
     <Layout title="Início" description="Pergunte algo médico – experiência estilo ChatGPT.">
@@ -275,7 +277,7 @@ export default function Home() {
                 </Link>
               ) : (
                 <Link
-                  href="/auth/signin"
+                  href="/auth/signup"
                   className="btn rounded-full h-11 px-7 shadow-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
                   aria-label="Entrar"
                 >

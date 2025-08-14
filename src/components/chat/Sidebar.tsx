@@ -4,7 +4,9 @@
 
 import { memo, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
-import { Search, Stethoscope, FileText, MessageSquare, Settings, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react'
+import { Search, Stethoscope, FileText, MessageSquare, Settings, ChevronDown, ChevronUp, ChevronRight, LogOut } from 'lucide-react'
+
+import { signOut } from 'next-auth/react'
 
 export type SidebarItem = {
   id: string
@@ -296,6 +298,16 @@ function SidebarImpl({ items, userEmail, isVerified, activeId, onSelect, onNew }
           className="w-full mt-1 rounded-lg px-3 py-2 text-[14px] border border-border hover:bg-[var(--panel)] transition"
         >
           + Novo chat
+        </button>
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: '/' })}
+          className="w-full mt-1 rounded-lg px-3 py-2 text-[14px] border border-border hover:bg-[var(--panel)] transition flex items-center gap-2 text-left"
+          title="Sair"
+          aria-label="Sair da conta"
+        >
+          <LogOut className="h-4 w-4" aria-hidden />
+          <span>Sair</span>
         </button>
       </div>
     </aside>

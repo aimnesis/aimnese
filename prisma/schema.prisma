@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// *
 /// * ******************
 /// * App + NextAuth   *
 /// * ******************
@@ -17,7 +16,7 @@ model User {
   password         String?
   firstName        String?
   lastName         String?
-  medicalLicenseId String?
+  medicalLicenseId String?        // mantido para compatibilidade
   isVerified       Boolean        @default(false)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
@@ -29,6 +28,9 @@ model User {
   queries          MedicalQuery[]
   sessions         Session[]
   subscriptions    Subscription[]
+
+  // NOVO: relação 1:1 com perfil médico
+  doctorProfile    DoctorProfile?
 
   @@index([email])
 }
@@ -70,7 +72,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-/// *
 /// * ******************
 /// * Modelos do App   *
 /// * ******************
@@ -111,4 +112,39 @@ model GeneratedDoc {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+/* ─────────────────────────────────────────────────────────
+   NOVO MODELO: Perfil médico 1:1 com User
+   ───────────────────────────────────────────────────────── */
+model DoctorProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // básicos do fluxo
+  title     String?  // "Dr." | "Dra." (opcional)
+  cpf       String?  @unique
+  birthDate DateTime?
+
+  // licença
+  crm       String?   // número
+  crmUF     String?   // UF (SP, RJ...)
+  // especialidade (livre; use specials.json no front)
+  specialty String?
+
+  // localização (opcional)
+  city      String?
+  stateUF   String?
+
+  // verificação
+  isVerified       Boolean   @default(false)
+  verifiedAt       DateTime?
+  verificationNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([crm, crmUF])
+  @@index([cpf])
 }
