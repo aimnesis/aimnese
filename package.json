@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "check": "tsc -p tsconfig.json --noEmit && next lint",
@@ -16,7 +16,11 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "prisma:deploy": "prisma migrate deploy",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "vercel:login": "pnpm dlx vercel login",
+    "vercel:link": "pnpm dlx vercel link --yes",
+    "deploy": "pnpm dlx vercel --prod --yes",
+    "preview": "pnpm dlx vercel"
   },
   "dependencies": {
     "@babel/code-frame": "^7.27.1",
