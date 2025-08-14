@@ -151,7 +151,7 @@ function SidebarImpl({ items, userEmail, isVerified, activeId, onSelect, onNew }
     <aside className="h-full w-full flex flex-col" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
       {/* BRAND / TOPO */}
       <div className="px-4 pt-4 pb-2 flex items-center gap-3 select-none">
-        <Image src="/logo.png" alt="Logo" width={100} height={100} />
+        <Image src="/logo-aimnesis.svg" alt="Logo" width={100} height={100} />
         <div className="text-[15px] font-semibold tracking-tight">AIMNESIS</div>
       </div>
 
