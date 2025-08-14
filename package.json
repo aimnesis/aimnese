@@ -12,6 +12,8 @@
     "lint": "next lint",
     "check": "tsc -p tsconfig.json --noEmit && next lint",
     "postinstall": "prisma generate",
+    "prebuild": "prisma generate",
+    "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
@@ -19,8 +21,9 @@
     "seed": "ts-node prisma/seed.ts",
     "vercel:login": "pnpm dlx vercel login",
     "vercel:link": "pnpm dlx vercel link --yes",
-    "deploy": "pnpm dlx vercel --prod --yes",
-    "preview": "pnpm dlx vercel"
+    "vercel:pull": "pnpm dlx vercel pull --yes --environment=production",
+    "deploy": "pnpm dlx vercel --prod --confirm",
+    "preview": "pnpm dlx vercel --confirm"
   },
   "dependencies": {
     "@babel/code-frame": "^7.27.1",

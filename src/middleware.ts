@@ -2,9 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const SUPPORTED = ['pt', 'en'] as const
-const DEFAULT = 'en'
+type SupportedLocale = typeof SUPPORTED[number]
+const DEFAULT: SupportedLocale = 'en'
 
-function countryToLocale(country: string | null): string {
+function isSupportedLocale(v: string | null | undefined): v is SupportedLocale {
+  return !!v && (SUPPORTED as readonly string[]).includes(v)
+}
+
+function countryToLocale(country: string | null): SupportedLocale {
   if (!country) return DEFAULT
   const c = country.toLowerCase()
   if (c === 'br' || c === 'pt') return 'pt'
@@ -12,7 +17,7 @@ function countryToLocale(country: string | null): string {
   return DEFAULT
 }
 
-function parseAcceptLanguage(header: string | null): string | null {
+function parseAcceptLanguage(header: string | null): SupportedLocale | null {
   if (!header) return null
   const langs = header.split(',').map((l) => l.trim().split(';')[0])
   for (const lang of langs) {
@@ -24,25 +29,27 @@ function parseAcceptLanguage(header: string | null): string | null {
 
 export function middleware(req: NextRequest) {
   const cookieLocale = req.cookies.get('NEXT_LOCALE')?.value
-  if (cookieLocale && SUPPORTED.includes(cookieLocale as any)) return NextResponse.next()
-
-  const countryHeader = req.headers.get('x-vercel-ip-country') || null
-  let locale = countryToLocale(countryHeader)
-
-  if (!SUPPORTED.includes(locale as any)) {
-    const accept = req.headers.get('accept-language')
-    const fromHeader = parseAcceptLanguage(accept)
-    if (fromHeader) locale = fromHeader
+  if (isSupportedLocale(cookieLocale)) {
+    return NextResponse.next()
   }
 
+  const countryHeader = req.headers.get('x-vercel-ip-country')
+  let locale: SupportedLocale = countryToLocale(countryHeader)
+
+  const fromHeader = parseAcceptLanguage(req.headers.get('accept-language'))
+  if (fromHeader) locale = fromHeader
+
   const res = NextResponse.next()
-  res.cookies.set('NEXT_LOCALE', SUPPORTED.includes(locale as any) ? locale : DEFAULT, {
+  res.cookies.set('NEXT_LOCALE', isSupportedLocale(locale) ? locale : DEFAULT, {
     path: '/',
     maxAge: 60 * 60 * 24 * 30,
   })
   return res
 }
 
+// Evita rodar em assets, dados estáticos e APIs
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api|auth).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|_next/data|favicon.ico|robots.txt|sitemap.xml|api|auth).*)',
+  ],
 }
