@@ -1,73 +1,59 @@
 // src/server/auth.ts
 import type { NextAuthOptions } from 'next-auth'
-import EmailProvider from 'next-auth/providers/email'
-import CredentialsProvider from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
+import CredentialsProvider from 'next-auth/providers/credentials'
+import EmailProvider from 'next-auth/providers/email'
+import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcrypt'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+  session: { strategy: 'jwt' },
+  pages: { signIn: '/auth/signin' },
+  secret: process.env.NEXTAUTH_SECRET,
+
   providers: [
-    // ---- Credentials (email + senha) ----
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
-        email: { label: 'Email', type: 'text' },
+        email: { label: 'E-mail', type: 'email' },
         password: { label: 'Senha', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: { doctorProfile: true },
-        })
-        if (!user?.password) return null
-        const ok = await bcrypt.compare(credentials.password, user.password)
-        return ok ? { id: user.id, email: user.email, name: user.name || '' } : null
+        const email = credentials?.email?.toLowerCase()
+        const password = credentials?.password
+        if (!email || !password) return null
+
+        const user = await prisma.user.findUnique({ where: { email } })
+        if (!user || !user.password) return null
+
+        const ok = await bcrypt.compare(password, user.password)
+        if (!ok) return null
+
+        // Retorne um objeto minimal de usuário
+        return { id: user.id, email: user.email, name: user.name ?? undefined }
       },
     }),
 
-    // ---- Email link (magic link) ----
-    EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST!,
-        port: Number(process.env.EMAIL_SERVER_PORT || 587),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER!,
-          pass: process.env.EMAIL_SERVER_PASSWORD!,
-        },
-      },
-      from: process.env.EMAIL_FROM!,
-      maxAge: 24 * 60 * 60,
-    }),
+    // Opcional: login por e-mail (Magic Link).
+    // Só ativa se as ENV necessárias existirem.
+    ...(process.env.EMAIL_SERVER_HOST &&
+    process.env.EMAIL_SERVER_USER &&
+    process.env.EMAIL_SERVER_PASSWORD &&
+    process.env.EMAIL_FROM
+      ? [
+          EmailProvider({
+            server: {
+              host: process.env.EMAIL_SERVER_HOST,
+              port: Number(process.env.EMAIL_SERVER_PORT || 587),
+              auth: {
+                user: process.env.EMAIL_SERVER_USER,
+                pass: process.env.EMAIL_SERVER_PASSWORD,
+              },
+            },
+            from: process.env.EMAIL_FROM,
+          }),
+        ]
+      : []),
   ],
-  pages: { signIn: '/auth/signin' },
-  session: { strategy: 'jwt' },
-  callbacks: {
-    async signIn({ user, account }) {
-      // Só restringimos magic link (provider === 'email')
-      if (account?.provider === 'email') {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: user.email || '' },
-          include: { doctorProfile: true },
-        })
-        // Precisa ter perfil médico e estar verificado
-        const allowed =
-          !!dbUser?.doctorProfile &&
-          dbUser.doctorProfile.isVerified === true
-
-        if (!allowed) {
-          // bloqueia magic link p/ incompletos/não verificados
-          return false
-        }
-      }
-      return true
-    },
-    async session({ session, token }) {
-      if (session.user && token?.sub) session.user.id = token.sub
-      return session
-    },
-  },
-  secret: process.env.NEXTAUTH_SECRET,
 }

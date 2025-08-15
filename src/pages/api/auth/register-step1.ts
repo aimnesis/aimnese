@@ -1,6 +1,6 @@
 // src/pages/api/auth/register-step1.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'                // << trocado
 import { prisma } from '@/lib/prisma'
 
 type ApiOk = { ok: true; userId: string }
@@ -33,7 +33,7 @@ export default async function handler(
       return
     }
 
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(password, 10)   // << troca segura
     const derivedName = [firstName, lastName].filter(Boolean).join(' ').trim()
     const computedName = name ?? (derivedName ? derivedName : undefined)
 
