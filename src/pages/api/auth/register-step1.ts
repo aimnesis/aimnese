@@ -16,6 +16,7 @@ export default async function handler(
   }
 
   try {
+    console.log('DB_HOST_AT_RUNTIME', new URL(process.env.DATABASE_URL!).host)
     const { email, password, firstName, lastName, name } = req.body as {
       email?: string
       password?: string
