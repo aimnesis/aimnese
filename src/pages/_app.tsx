@@ -3,7 +3,9 @@ import type { AppProps } from 'next/app'
 import { SessionProvider } from 'next-auth/react'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { useEffect } from 'react'
+import { appWithTranslation } from 'next-i18next'
 import '@/styles/globals.css'
+import '@/lib/i18n';
 
 /**
  * Define o tema automaticamente:
@@ -15,11 +17,11 @@ function AutoTheme() {
   const { theme, setTheme, resolvedTheme } = useTheme()
 
   useEffect(() => {
-    // Se o usuário já escolheu manualmente (salvo pelo next-themes),
-    // não forçamos nada.
-    const manual = localStorage.getItem('theme')
-    if (manual) return
-
+    // Se o usuário já escolheu manualmente (salvo pelo next-themes), não forçamos.
+    try {
+      const manual = localStorage.getItem('theme')
+      if (manual) return
+    } catch {}
     const hour = new Date().getHours()
     const preferred = hour >= 6 && hour < 18 ? 'light' : 'dark'
     setTheme(preferred)
@@ -28,17 +30,14 @@ function AutoTheme() {
   // Ajusta a classe .dark no <html> de acordo com o tema atual
   useEffect(() => {
     const root = document.documentElement
-    if ((theme ?? resolvedTheme) === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
+    if ((theme ?? resolvedTheme) === 'dark') root.classList.add('dark')
+    else root.classList.remove('dark')
   }, [theme, resolvedTheme])
 
   return null
 }
 
-export default function MyApp({ Component, pageProps }: AppProps) {
+function MyApp({ Component, pageProps }: AppProps) {
   return (
     <SessionProvider>
       <ThemeProvider
@@ -53,3 +52,5 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     </SessionProvider>
   )
 }
+
+export default appWithTranslation(MyApp)

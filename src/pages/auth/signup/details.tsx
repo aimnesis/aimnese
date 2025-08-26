@@ -14,7 +14,6 @@ export default function SignUpStep2() {
 
   const [phone, setPhone] = useState('')
   const [cpf, setCpf] = useState('')
-  const [birthDate, setBirthDate] = useState('')
   const [crm, setCrm] = useState('')
   const [crmUf, setCrmUf] = useState<string>('SP')
   const [specialty, setSpecialty] = useState<string>('')
@@ -40,11 +39,12 @@ export default function SignUpStep2() {
         body: JSON.stringify({
           userId,
           cpf,
-          birthDate,
+          // birthDate removido
           crm,
           crmUF: crmUf,
           specialty,
-          // você pode salvar phone se desejar: city/state foram removidos
+          // opcionalmente envie o phone também, se quiser persistir:
+          phone,
         }),
       })
       const data = await res.json()
@@ -88,12 +88,8 @@ export default function SignUpStep2() {
             pattern="\d{11}"
             title="Digite 11 dígitos"
           />
-          <input
-            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-neutral-50 dark:bg-neutral-800 px-3 py-2"
-            type="date"
-            value={birthDate}
-            onChange={(e)=>setBirthDate(e.target.value)}
-          />
+
+          {/* Campo de data de nascimento removido */}
 
           <div className="flex gap-2">
             <input

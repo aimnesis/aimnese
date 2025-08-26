@@ -44,7 +44,7 @@
 
   html, body, #__next { height: 100%; }
   html { color-scheme: light; }
-  .dark html { color-scheme: dark; }
+  html.dark { color-scheme: dark; }
 
   body {
     @apply antialiased;
@@ -61,6 +61,18 @@
   /* Safe areas iOS */
   .safe-bottom { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
   .safe-top    { padding-top:    calc(env(safe-area-inset-top) + 8px); }
+
+  /* kbd acessível */
+  kbd {
+    @apply inline-block rounded border border-base px-1 py-0.5 text-[11px] align-baseline;
+    background: var(--panel);
+    color: var(--fg);
+  }
+
+  /* respeito a prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  }
 }
 
 /* =========================
@@ -122,8 +134,13 @@
   .bg-panel-2  { background: var(--panel-2); }
   .text-muted  { color: var(--muted); }
   .border-base { border-color: var(--border); }
-  .ring-border { --tw-ring-color: var(--border) }
+  .ring-border { --tw-ring-color: var(--border); }
   .btn-accent  { background: var(--accent); color: var(--accent-fg); }
+
+  /* evita overflow no Sidebar */
+  .sidebar-item, .sidebar-title, .sidebar-subtitle{
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 }
 
 /* =========================
@@ -132,9 +149,7 @@
 #nprogress { pointer-events: none; }
 #nprogress .bar {
   background: var(--accent);
-  position: fixed;
-  z-index: 1031;
-  top: 0; left: 0;
+  position: fixed; z-index: 1031; top: 0; left: 0;
   width: 100%; height: 2px;
 }
 #nprogress .peg {
@@ -144,3 +159,21 @@
   opacity: 1; transform: rotate(3deg) translate(0,-4px);
 }
 #nprogress .spinner { display: none; }
+
+/* container da app: sidebar estável de 300px em desktop */
+@layer utilities {
+  .layout-dashboard { min-height: 100dvh; }
+  @media (min-width: 768px){
+    .layout-dashboard{
+      display: grid;
+      grid-template-columns: 300px 1fr;
+    }
+  }
+}
+
+/* Tipografia específica do bloco de resposta */
+.answer h3 { margin-top: .25rem; }
+.answer h4 { margin-top: .25rem; }
+.answer p  { margin: 0; }
+.answer a  { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.answer ul { margin: 0; padding-left: 1.25rem; }

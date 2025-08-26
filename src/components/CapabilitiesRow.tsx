@@ -22,19 +22,15 @@ export default function CapabilitiesRow({
 }: CapabilitiesRowProps) {
   return (
     <div className={`w-full max-w-[960px] flex flex-col items-center gap-2 mb-4 ${className}`}>
-      <div className="flex flex-nowrap gap-4 overflow-x-auto py-1 justify-center w-full">
+      <div className="flex flex-nowrap gap-3 overflow-x-auto py-1 justify-center w-full">
         {capabilities.map((c) => (
           <button
             key={c.key}
             onClick={c.onClick}
-            className="flex flex-shrink-0 items-center gap-2 border border-white rounded-lg px-6 py-3 text-white text-base font-medium hover:bg-[#1f1f1f] transition whitespace-nowrap"
+            className="flex flex-shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-[14px] font-medium border border-base bg-panel hover:bg-panel-2 transition whitespace-nowrap"
             type="button"
           >
-            {c.icon && (
-              <span className="flex-shrink-0" aria-hidden="true">
-                {c.icon}
-              </span>
-            )}
+            {c.icon && <span className="opacity-80" aria-hidden="true">{c.icon}</span>}
             <span>{c.label}</span>
           </button>
         ))}
@@ -43,7 +39,7 @@ export default function CapabilitiesRow({
       {onExploreMore && (
         <button
           onClick={onExploreMore}
-          className="mt-1 flex items-center gap-2 bg-transparent border-none text-white font-medium text-base hover:underline transition"
+          className="mt-1 inline-flex items-center gap-2 text-sm text-muted hover:underline"
           type="button"
         >
           <span>Explorar mais funcionalidades</span>
@@ -57,7 +53,7 @@ export default function CapabilitiesRow({
             strokeLinejoin="round"
             viewBox="0 0 24 24"
             aria-hidden="true"
-            className="rotate-180"
+            className="rotate-180 opacity-80"
           >
             <path d="M6 9l6 6 6-6" />
           </svg>

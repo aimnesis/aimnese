@@ -1,13 +1,5 @@
-import * as Sentry from '@sentry/nextjs';
-
+// src/instrumentation.ts
+// No-op: Sentry foi removido. Mantemos a função para satisfazer o Next.js.
 export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('../sentry.server.config');
-  }
-
-  if (process.env.NEXT_RUNTIME === 'edge') {
-    await import('../sentry.edge.config');
-  }
+  // intencionalmente vazio
 }
-
-export const onRequestError = Sentry.captureRequestError;

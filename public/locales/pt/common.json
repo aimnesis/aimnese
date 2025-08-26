@@ -1,4 +1,128 @@
 {
+  "app": {
+    "name": "Aimnesis",
+    "shortDesc": "Copiloto clínico para médicos"
+  },
+  "navbar": {
+    "home": "Início",
+    "dashboard": "Painel",
+    "pricing": "Planos",
+    "signin": "Entrar",
+    "signup": "Criar conta",
+    "logout": "Sair",
+    "settings": "Configurações"
+  },
+  "footer": {
+    "privacy": "Privacidade",
+    "terms": "Termos",
+    "rights": "Todos os direitos reservados."
+  },
+  "home": {
+    "heroTitle": "Seu copiloto clínico — rápido, seguro, baseado em evidências.",
+    "heroCtaFree": "Testar agora (Grátis)",
+    "heroCtaPro": "Assinar PRO",
+    "bullets": {
+      "time": "Economize tempo sem perder qualidade",
+      "security": "LGPD, segurança e consentimento claro",
+      "evidence": "Sugestões baseadas em diretrizes e boas práticas"
+    },
+    "exploreMore": "Explorar mais funcionalidades"
+  },
+  "modes": {
+    "general": {
+      "label": "Geral",
+      "badge": "Grátis",
+      "headline": "Tira-dúvidas clínico rápido e objetivo.",
+      "subline": ">92% de evidência no geral",
+      "cta": "Pergunte agora"
+    },
+    "studies": {
+      "label": "Estudos",
+      "badge": "Grátis",
+      "headline": "Busque artigos e diretrizes, com resumo prático.",
+      "subline": "Fontes confiáveis e atualizadas",
+      "cta": "Pergunte agora"
+    },
+    "plantao": {
+      "label": "Plantão",
+      "badge": "PRO",
+      "headline": "Condutas imediatas para emergências.",
+      "subline": "Foco em priorização e segurança",
+      "cta": "Grave seu caso"
+    },
+    "consultorio": {
+      "label": "Consultório",
+      "badge": "PRO",
+      "headline": "Anamnese estruturada em tempo real (até 60 min).",
+      "subline": "Maior qualidade, menos digitação",
+      "cta": "Gravar consulta"
+    },
+    "specialties": {
+      "label": "Especialidades",
+      "badge": "PRO",
+      "headline": "Diretrizes por especialidade com checklist.",
+      "subline": "Cardio, Endócrino, Neuro e mais",
+      "cta": "Abrir especialidade"
+    },
+    "analysis": {
+      "label": "Análise/Prescrição",
+      "badge": "PRO",
+      "headline": "S/O/A/P completo com plano medic./não medic.",
+      "subline": "Gera plano e prescrição com segurança",
+      "cta": "Iniciar análise"
+    }
+  },
+  "premiumGate": {
+    "title": "Recurso premium",
+    "genericMsg": "Este recurso é PRO. Assine para desbloquear acesso ilimitado.",
+    "modeMsg": "O modo {{mode}} é PRO. Assine para desbloquear acesso ilimitado.",
+    "ctaNow": "Assinar agora",
+    "ctaPlans": "Ver planos"
+  },
+  "pricing": {
+    "title": "Planos",
+    "freeTitle": "Gratuito",
+    "freeDesc": "Geral + Estudos ilimitados.",
+    "proTitle": "PRO",
+    "proDesc": "Plantão, Consultório, Especialidades e Análise — ilimitados.",
+    "monthly": "Mensal",
+    "yearly": "Anual",
+    "priceMonthly": "R$99/mês",
+    "priceYearly": "R$999/ano",
+    "subscribeMonthly": "Assinar Mensal",
+    "subscribeYearly": "Assinar Anual",
+    "manage": "Gerenciar assinatura"
+  },
+  "dashboard": {
+    "title": "Selecione um modo",
+    "hint": "Dois modos grátis para experimentar, quatro PRO para destravar sua produtividade.",
+    "open": "Abrir",
+    "freeBadge": "Grátis",
+    "proBadge": "PRO"
+  },
+  "recorder": {
+    "quick": {
+      "title": "Gravação rápida",
+      "upload": "Enviar arquivo de áudio",
+      "done": "Transcrição pronta. Enviada ao Copiloto."
+    },
+    "long": {
+      "title": "Gravação da consulta",
+      "bgWarn": "A aba está em segundo plano; a qualidade pode variar. (PWA desktop recomendado)"
+    },
+    "actions": {
+      "start": "Iniciar",
+      "pause": "Pausar",
+      "resume": "Retomar",
+      "finish": "Finalizar",
+      "discard": "Descartar"
+    },
+    "errors": {
+      "micDenied": "Permissão de microfone negada ou navegador não suportado.",
+      "timeout": "Tempo esgotado na transcrição",
+      "generic": "Erro na transcrição"
+    }
+  },
   "signup": {
     "title": "Criar conta",
     "email": "E-mail",
@@ -7,8 +131,5 @@
     "submit": "Cadastrar",
     "already": "Já tem conta?",
     "login": "Entrar"
-  },
-  "home": {
-    "exploreMore": "Explorar mais funcionalidades"
   }
 }

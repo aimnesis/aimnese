@@ -7,18 +7,17 @@ import { authOptions } from '@/server/auth'
 import { generateFull, generateStream } from '@/lib/llm'
 import { transcribeAudioFiles } from '@/lib/asr'
 import { rateLimit } from '@/lib/rateLimit'
-import * as Sentry from '@sentry/nextjs'
 
 // ───────────────────────────────────────────────────────────
-// Next disables body parsing so we can handle multipart/form-data
+// Desliga o body parser do Next p/ lidarmos com multipart/form-data
 // ───────────────────────────────────────────────────────────
 export const config = { api: { bodyParser: false } }
 
-// Response types
+// Tipos de resposta
 type ApiOk = { id: string; answer: string; question: string; createdAt: string }
 type ApiErr = { error: string }
 
-// Limits & MIME allowlist
+// Limites & MIME allowlist (alinhados ao Composer)
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 const MAX_FILES = 6
 const ACCEPTED_MIME = new Set([
@@ -43,7 +42,32 @@ async function readRawBody(req: NextApiRequest): Promise<string> {
   })
 }
 
-/** Parse tanto multipart/form-data quanto JSON puro */
+/** Garante que pegamos "files" mas também "file"/"audio" por compatibilidade */
+function pickAllFiles(f: formidable.Files): File[] {
+  const out: File[] = []
+  const tryPush = (v: unknown) => {
+    if (!v) return
+    if (Array.isArray(v)) out.push(...(v as File[]))
+    else out.push(v as File)
+  }
+  const any = f as Record<string, unknown>
+  // prioridades conhecidas
+  tryPush(any['files'])
+  tryPush(any['file'])
+  tryPush(any['audio'])
+  // pega qualquer outro campo de arquivo (defensive)
+  for (const v of Object.values(any)) {
+    if (!v) continue
+    if (Array.isArray(v)) {
+      for (const x of v) if ((x as File)?.filepath && !out.includes(x as File)) out.push(x as File)
+    } else if ((v as File)?.filepath && !out.includes(v as File)) {
+      out.push(v as File)
+    }
+  }
+  return out
+}
+
+/** Faz parse de multipart/form-data ou JSON cru (bodyParser off) */
 async function parseRequest(
   req: NextApiRequest
 ): Promise<{ prompt: string; files: File[] }> {
@@ -56,7 +80,10 @@ async function parseRequest(
       allowEmptyFiles: false,
       maxFileSize: MAX_FILE_SIZE,
       maxTotalFileSize: MAX_FILE_SIZE * MAX_FILES,
-      filter: (part) => (part.mimetype ? ACCEPTED_MIME.has(part.mimetype) : true),
+      filter: (part) => {
+        // se o navegador não mandar mimetype, deixamos passar (servidor valida depois)
+        return part.mimetype ? ACCEPTED_MIME.has(part.mimetype) : true
+      },
     })
 
     const { fields, files } = await new Promise<{
@@ -70,15 +97,9 @@ async function parseRequest(
 
     const prompt =
       (Array.isArray(fields.prompt) ? fields.prompt[0] : fields.prompt) || ''
-    const picked: File[] = []
-    const anyFiles = files.files
-    if (anyFiles) {
-      if (Array.isArray(anyFiles)) picked.push(...(anyFiles as File[]))
-      else picked.push(anyFiles as File)
-    }
-    // limita quantidade
-    const normalized = picked.slice(0, MAX_FILES)
-    return { prompt: String(prompt || ''), files: normalized }
+
+    const picked = pickAllFiles(files).slice(0, MAX_FILES)
+    return { prompt: String(prompt || ''), files: picked }
   }
 
   // JSON (precisamos ler manualmente pois bodyParser está off)
@@ -91,14 +112,10 @@ async function parseRequest(
   }
 }
 
-/** Recupera sessão (quando existir) e retorna userId/email de forma safe */
+/** Sessão segura (pode não existir) */
 async function getSessionUser(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const session = await getServerSession(
-      req as any,
-      res as any,
-      authOptions as any
-    )
+    const session = await getServerSession(req as any, res as any, authOptions as any)
     const user = (session as any)?.user || null
     return {
       userId: (user as any)?.id ?? null,
@@ -107,6 +124,11 @@ async function getSessionUser(req: NextApiRequest, res: NextApiResponse) {
   } catch {
     return { userId: null, email: null }
   }
+}
+
+/** Gera um ID estável p/ o item (não colide em ambiente serverless) */
+function newQueryId() {
+  return `q_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
 // ───────────────────────────────────────────────────────────
@@ -121,7 +143,7 @@ export default async function handler(
     return
   }
 
-  // Rate limit (anti-abuso no beta)
+  // Rate limit básico (anti-abuso)
   try {
     await rateLimit(req, res, { max: 30, windowMs: 60_000 }) // 30 req/min por IP
   } catch {
@@ -142,33 +164,42 @@ export default async function handler(
       return
     }
 
-    // Sessão (pode ser null em modo anônimo)
+    // Sessão (pode ser null/guest)
     const { userId } = await getSessionUser(req, res)
 
-    // Se vier áudio, transcreve e anexa como contexto
+    // Se vier áudio, transcreve e adiciona como contexto adicional
     let transcripts: string[] = []
     try {
-      transcripts = await transcribeAudioFiles(files)
+      if (files.length) {
+        const audioOnly = files.filter((f) => {
+          const t = (f as any).mimetype || ''
+          return t.startsWith('audio/')
+        })
+        if (audioOnly.length) {
+          transcripts = await transcribeAudioFiles(audioOnly)
+        }
+      }
     } catch (e) {
       console.error('Transcription failed:', e)
-      Sentry.captureException(e)
     }
 
     // STREAMING
     if (wantsStream) {
-      const id = `q_${Date.now()}`
+      const id = newQueryId()
       const createdAt = new Date()
       const question = prompt.trim()
 
-      // headers antes de qualquer write
+      // headers precisam ir ANTES de qualquer write
       res.setHeader('Content-Type', 'text/plain; charset=utf-8')
       res.setHeader('Cache-Control', 'no-cache, no-transform')
       res.setHeader('Connection', 'keep-alive')
-      res.setHeader(
-        'x-aim-answer-meta',
-        JSON.stringify({ id, question, createdAt: createdAt.toISOString() })
-      )
-      // flush headers se disponível (nem todo adaptador expõe)
+
+      // Header customizado deve conter apenas ASCII; encode em base64
+      const meta = { id, question, createdAt: createdAt.toISOString() }
+      const metaB64 = Buffer.from(JSON.stringify(meta), 'utf8').toString('base64')
+      res.setHeader('x-aim-answer-meta', metaB64)
+      res.setHeader('x-aim-answer-meta-encoding', 'base64')
+
       ;(res as any).flushHeaders?.()
 
       let answer = ''
@@ -179,16 +210,13 @@ export default async function handler(
         }
       } catch (streamErr) {
         console.error('Erro durante stream:', streamErr)
-        Sentry.captureException(streamErr)
       } finally {
-        try {
-          res.end()
-        } catch {}
+        try { res.end() } catch {}
       }
 
-      // Persiste (async; não bloqueia a resposta)
+      // Persistência assíncrona (não bloqueia a resposta)
       try {
-        await prisma.medicalQuery.create({
+        await prisma.query.create({
           data: {
             id,
             userId,
@@ -200,44 +228,37 @@ export default async function handler(
         })
       } catch (e) {
         console.error('Persistência (stream) falhou:', e)
-        Sentry.captureException(e)
       }
 
       return
     }
 
     // JSON (fallback non-stream)
-    const answer = await generateFull(prompt.trim(), { transcripts })
-    const id = `q_${Date.now()}`
-    const createdAt = new Date().toISOString()
     const question = prompt.trim()
+    const answer = await generateFull(question, { transcripts })
+    const id = newQueryId()
+    const createdAtISO = new Date().toISOString()
 
-    // Persiste
     try {
-      await prisma.medicalQuery.create({
+      await prisma.query.create({
         data: {
           id,
           userId,
           question,
           answer,
           queryType: 'evidence',
-          createdAt: new Date(createdAt),
+          createdAt: new Date(createdAtISO),
         },
       })
     } catch (e) {
       console.error('Persistência (no-stream) falhou:', e)
-      Sentry.captureException(e)
     }
 
-    const payload: ApiOk = { id, answer, question, createdAt }
+    const payload: ApiOk = { id, answer, question, createdAt: createdAtISO }
     res.status(200).json(payload)
   } catch (e: any) {
     console.error('/api/ask error', e)
-    Sentry.captureException(e)
     if (!res.headersSent) res.status(500).json({ error: 'Internal error' })
-    else
-      try {
-        res.end()
-      } catch {}
+    else { try { res.end() } catch {} }
   }
 }

@@ -24,10 +24,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user) return res.status(404).json({ error: 'User not found' })
 
   const [total, queries] = await Promise.all([
-    prisma.medicalQuery.count({
+    prisma.query.count({
       where: { userId: user.id },
     }),
-    prisma.medicalQuery.findMany({
+    prisma.query.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
       skip,

@@ -1,6 +1,6 @@
 // src/pages/api/auth/register-step1.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import bcrypt from 'bcryptjs'                // << trocado
+import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 
 type ApiOk = { ok: true; userId: string }
@@ -11,61 +11,45 @@ export default async function handler(
   res: NextApiResponse<ApiOk | ApiErr>
 ) {
   if (req.method !== 'POST') {
-    res.status(405).json({ ok: false, error: 'Method not allowed' })
-    return
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
   try {
-    console.log('DB_HOST_AT_RUNTIME', new URL(process.env.DATABASE_URL!).host)
-    const { email, password, firstName, lastName, name } = req.body as {
-      email?: string
-      password?: string
-      firstName?: string
-      lastName?: string
-      name?: string
+    // valida / normaliza
+    const { name, email, password } = (req.body || {}) as {
+      name?: string; email?: string; password?: string
     }
 
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      res.status(400).json({ ok: false, error: 'E-mail inválido' })
-      return
+      return res.status(400).json({ ok: false, error: 'E-mail inválido' })
     }
     if (!password || password.length < 8) {
-      res.status(400).json({ ok: false, error: 'Senha inválida (mín. 8 caracteres)' })
-      return
+      return res.status(400).json({ ok: false, error: 'Senha inválida (mín. 8 caracteres)' })
     }
 
-    const passwordHash = await bcrypt.hash(password, 10)   // << troca segura
-    const derivedName = [firstName, lastName].filter(Boolean).join(' ').trim()
-    const computedName = name ?? (derivedName ? derivedName : undefined)
+    const emailNorm = email.trim().toLowerCase()
+    const nameNorm = (name || '').trim() || null
+    const hash = await bcrypt.hash(password, 10)
 
+    // cria/atualiza usuário
     const user = await prisma.user.upsert({
-      where: { email: email.toLowerCase() },
-      update: {
-        password: passwordHash,
-        firstName: firstName ?? undefined,
-        lastName: lastName ?? undefined,
-        name: computedName,
-      },
-      create: {
-        email: email.toLowerCase(),
-        password: passwordHash,
-        firstName: firstName ?? undefined,
-        lastName: lastName ?? undefined,
-        name: computedName,
-        isVerified: false,
-      },
+      where: { email: emailNorm },
+      update: { password: hash, name: nameNorm ?? undefined, isVerified: false },
+      create: { email: emailNorm, password: hash, name: nameNorm, isVerified: false },
       select: { id: true },
     })
 
+    // garante 1:1 do perfil (barato/rápido)
     await prisma.doctorProfile.upsert({
       where: { userId: user.id },
       update: {},
       create: { userId: user.id },
     })
 
-    res.status(200).json({ ok: true, userId: user.id })
+    // RESPONDE JÁ — nada de esperar e-mail, etc.
+    return res.status(200).json({ ok: true, userId: user.id })
   } catch (e) {
-    console.error('register-step1 error', e)
-    res.status(500).json({ ok: false, error: 'Internal error' })
+    console.error('register-step1 error:', e)
+    return res.status(500).json({ ok: false, error: 'Internal error' })
   }
 }

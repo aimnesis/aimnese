@@ -22,18 +22,24 @@ export default function SignUpStep1() {
       const res = await fetch('/api/auth/register-step1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role, honorific,
-          // tentamos separar primeiro/último nome se o usuário digitar o completo
-          name, email, password
-        }),
+        body: JSON.stringify({ role, honorific, name, email, password }),
       })
+
+      // se a conexão cair (ex.: CORS/local), isso evita “pendente” infinito
+      if (!res.ok) {
+        let msg = 'Falha ao criar conta'
+        try {
+          const j = await res.json()
+          if (j?.error) msg = j.error
+        } catch {}
+        throw new Error(msg)
+      }
+
       const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Falha ao criar conta')
       sessionStorage.setItem('signup_email', email)
       sessionStorage.setItem('signup_password', password)
       await router.push(`/auth/signup/details?uid=${encodeURIComponent(data.userId)}`)
-    } catch (err:any) {
+    } catch (err: any) {
       setError(err?.message || 'Erro inesperado')
     } finally {
       setLoading(false)

@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const baseConfig = {
+const nextConfig = {
   reactStrictMode: true,
   images: { domains: ['avatars.githubusercontent.com'] },
   webpack: (config, { dev }) => {
@@ -9,19 +9,6 @@ const baseConfig = {
     }
     return config
   },
-}
-
-let nextConfig = baseConfig
-
-try {
-  const { withSentryConfig } = require('@sentry/nextjs')
-  nextConfig = withSentryConfig(baseConfig, {
-    silent: true,
-  }, {
-    hideSourceMaps: true,
-  })
-} catch {
-  // Sentry não instalado/sem DSN — segue sem ele
 }
 
 module.exports = nextConfig

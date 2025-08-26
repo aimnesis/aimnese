@@ -23,20 +23,30 @@ export default function SignIn() {
   const [loadingLink, setLoadingLink] = useState(false)
 
   async function handlePassword(e: React.FormEvent) {
-    e.preventDefault()
-    setErr(null); setLoadingPwd(true)
-    try {
-      const res = await signIn('credentials', {
-        email, password, redirect: false, callbackUrl: '/dashboard'
-      })
-      if (res?.ok) window.location.href = '/dashboard'
-      else setErr('E-mail ou senha inválidos.')
-    } catch (e:any) {
-      setErr(e?.message || 'Erro ao entrar.')
-    } finally {
-      setLoadingPwd(false)
+  e.preventDefault()
+  setErr(null); setLoadingPwd(true)
+
+  // timeout de proteção para UX
+  const timeout = new Promise(resolve => setTimeout(resolve, 12000, { ok: false, error: 'timeout' }))
+
+  try {
+    const res: any = await Promise.race([
+      signIn('credentials', { email, password, redirect: false, callbackUrl: '/dashboard' }),
+      timeout
+    ])
+    if (res?.ok) {
+      window.location.href = '/dashboard'
+    } else if (res?.error === 'timeout') {
+      setErr('O login está demorando. Tente novamente em alguns segundos.')
+    } else {
+      setErr('E-mail ou senha inválidos.')
     }
+  } catch (e: any) {
+    setErr(e?.message || 'Erro ao entrar.')
+  } finally {
+    setLoadingPwd(false)
   }
+}
 
   async function handleMagicLink(e: React.FormEvent) {
     e.preventDefault()

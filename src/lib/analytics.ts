@@ -1,29 +1,15 @@
 // src/lib/analytics.ts
-import posthog from 'posthog-js'
+export type TrackFn = (event: string, props?: Record<string, any>) => void
 
-let inited = false
+let track: TrackFn = () => {}
+declare global { interface Window { posthog?: any } }
 
-export function initAnalytics() {
-  if (typeof window === 'undefined' || inited) return
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://app.posthog.com'
-  if (!key) return
-  posthog.init(key, {
-    api_host: host,
-    capture_pageview: true,
-    capture_pageleave: true,
-    // Respeito a privacidade (ajuste conforme política):
-    disable_session_recording: true,
-  })
-  inited = true
+try {
+  if (typeof window !== 'undefined' && (window as any).posthog?.capture) {
+    track = (evt, props) => (window as any).posthog.capture(evt, props)
+  }
+} catch {
+  // no-op
 }
 
-export function track(event: string, props?: Record<string, any>) {
-  try { posthog.capture(event, props) } catch {}
-}
-
-export function identify(userId?: string | null, props?: Record<string, any>) {
-  try {
-    if (userId) posthog.identify(userId, props)
-  } catch {}
-}
+export const analytics = { track }

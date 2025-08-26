@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import Layout from '@/components/Layout'
 import VoiceRecorder from '@/components/VoiceRecorder'
-import AnswerView from '@/components/AnswerView'
+import AnswerView from '@/components/ui/AnswerView'
 import { useTranslation } from 'react-i18next'
 
 type Reference = {
@@ -105,12 +105,29 @@ export default function VoicePage() {
           )}
 
           {answer && (
-            <div className="w-full mt-6">
-              <AnswerView
-                question={finalTranscript || interimTranscript}
-                answer={answer}
-                references={references}
-              />
+            <div className="w-full mt-6 space-y-4">
+              <div className="rounded-xl border border-white/10 p-4 bg-zinc-800/50">
+                <div className="text-xs uppercase tracking-wide text-zinc-400 mb-2">Pergunta</div>
+                <AnswerView text={finalTranscript || interimTranscript || ''} />
+              </div>
+              <div className="rounded-xl border border-white/10 p-4 bg-zinc-800/50">
+                <div className="text-xs uppercase tracking-wide text-zinc-400 mb-2">Resposta</div>
+                <AnswerView text={answer || ''} />
+              </div>
+              {references.length > 0 && (
+                <div className="rounded-xl border border-white/10 p-4 bg-zinc-800/50">
+                  <div className="text-xs uppercase tracking-wide text-zinc-400 mb-2">Referências</div>
+                  <ul className="list-disc pl-5 space-y-1 text-sm">
+                    {references.map((r, i) => (
+                      <li key={i}>
+                        <a href={r.url} target="_blank" rel="noopener noreferrer" className="underline">
+                          {r.title || r.url}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

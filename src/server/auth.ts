@@ -1,59 +1,62 @@
 // src/server/auth.ts
 import type { NextAuthOptions } from 'next-auth'
-import { PrismaAdapter } from '@next-auth/prisma-adapter'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import EmailProvider from 'next-auth/providers/email'
-import bcrypt from 'bcryptjs'
+import Credentials from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/auth/signin' },
-  secret: process.env.NEXTAUTH_SECRET,
-
   providers: [
-    CredentialsProvider({
-      name: 'Credentials',
+    Credentials({
+      name: 'credentials',
       credentials: {
-        email: { label: 'E-mail', type: 'email' },
-        password: { label: 'Senha', type: 'password' },
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
       },
-      async authorize(credentials) {
-        const email = credentials?.email?.toLowerCase()
-        const password = credentials?.password
-        if (!email || !password) return null
-
-        const user = await prisma.user.findUnique({ where: { email } })
-        if (!user || !user.password) return null
-
-        const ok = await bcrypt.compare(password, user.password)
-        if (!ok) return null
-
-        // Retorne um objeto minimal de usuário
-        return { id: user.id, email: user.email, name: user.name ?? undefined }
-      },
-    }),
-
-    // Opcional: login por e-mail (Magic Link).
-    // Só ativa se as ENV necessárias existirem.
-    ...(process.env.EMAIL_SERVER_HOST &&
-    process.env.EMAIL_SERVER_USER &&
-    process.env.EMAIL_SERVER_PASSWORD &&
-    process.env.EMAIL_FROM
-      ? [
-          EmailProvider({
-            server: {
-              host: process.env.EMAIL_SERVER_HOST,
-              port: Number(process.env.EMAIL_SERVER_PORT || 587),
-              auth: {
-                user: process.env.EMAIL_SERVER_USER,
-                pass: process.env.EMAIL_SERVER_PASSWORD,
-              },
-            },
-            from: process.env.EMAIL_FROM,
-          }),
-        ]
-      : []),
+      authorize: async (creds) => {
+        const started = Date.now()
+        try {
+          if (!creds?.email || !creds?.password) return null
+          const user = await prisma.user.findUnique({
+            where: { email: creds.email.toLowerCase() },
+            select: { id: true, email: true, password: true, name: true, isVerified: true, role: true, blocked: true }
+          })
+          if (!user?.password || user.blocked) return null
+          const ok = await bcrypt.compare(creds.password, user.password)
+          if (!ok) return null
+          return { id: user.id, email: user.email, name: user.name || undefined, role: user.role || 'user' }
+        } finally {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[nextauth] authorize(ms)=', Date.now() - started)
+          }
+        }
+      }
+    })
   ],
+
+  session: { strategy: 'jwt', maxAge: 60 * 60 * 24 * 30 }, // 30d
+  pages: { signIn: '/auth/signin' },
+
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user?.id) token.uid = user.id
+      if ((user as any)?.role) token.role = (user as any).role
+      // segura: se não veio do authorize, tenta carregar 1x (evita custo por request)
+      if (!token.role && token.uid) {
+        try {
+          const u = await prisma.user.findUnique({ where: { id: String(token.uid) }, select: { role: true } })
+          token.role = u?.role || 'user'
+        } catch {}
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user && token?.uid) {
+        ;(session.user as any).id = token.uid
+        ;(session.user as any).role = (token as any)?.role || 'user'
+      }
+      return session
+    }
+  },
+
+  debug: process.env.NODE_ENV !== 'production'
 }

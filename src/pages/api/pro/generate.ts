@@ -1,11 +1,11 @@
-// pages/api/pro/generate.ts
+// src/pages/api/pro/generate.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/server/auth'
 import { z } from 'zod'
-import { canUsePro } from '@/server/paywall'
+import { hasPro as canUsePro } from '@/server/paywall'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
@@ -22,20 +22,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).end()
 
   const session = (await getServerSession(req, res, authOptions as any)) as any
-  const userId = session?.user?.id
+  const userId = session?.user?.id as string | undefined
   if (!userId) return res.status(401).json({ error: 'Não autenticado' })
 
-  const { transcript } = req.body || {}
-  if (!transcript) return res.status(400).json({ error: 'transcript é obrigatório' })
+  const transcriptRaw = (req.body?.transcript ?? '').toString().trim()
+  if (!transcriptRaw) return res.status(400).json({ error: 'transcript é obrigatório' })
+  if (transcriptRaw.length < 10) return res.status(400).json({ error: 'transcript muito curto' })
 
-  const gate = await canUsePro(userId)
-  if (!gate.allowed) return res.status(402).json({ error: 'Limite de uso atingido. Assine o PRO.' })
+  const allowed = await canUsePro(userId)
+  if (!allowed) return res.status(402).json({ error: 'Limite de uso atingido. Assine o PRO.' })
 
   try {
-    const system = `Você é um assistente médico que transforma transcrição em 6 documentos clínicos.
+    const system = `Você é um assistente médico que transforma uma transcrição em 6 documentos clínicos.
 Responda SEMPRE em pt-BR e em JSON estrito com as chaves: anamnese, soap, orientacoes, prescricoes, exames, laudos.
 Evite alucinar; use apenas o que está no transcript.`
-    const user = `TRANSCRIPT:\n${transcript}\n\nGere o JSON solicitado.`
+
+    const user = `TRANSCRIPT:\n${transcriptRaw}\n\nGere o JSON solicitado.`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -50,10 +52,10 @@ Evite alucinar; use apenas o que está no transcript.`
     const raw = completion.choices?.[0]?.message?.content || '{}'
     const parsed = OutSchema.parse(JSON.parse(raw))
 
-    await prisma.medicalQuery.create({
+    await prisma.query.create({
       data: {
         userId,
-        question: transcript.slice(0, 180),
+        question: transcriptRaw.slice(0, 180),
         answer: JSON.stringify(parsed),
         queryType: 'PRO',
       },
@@ -70,7 +72,7 @@ Evite alucinar; use apenas o que está no transcript.`
 
     return res.status(200).json({ docs: parsed })
   } catch (e: any) {
-    console.error(e)
-    return res.status(500).json({ error: e.message || 'Falha na geração' })
+    console.error('[pro/generate]', e)
+    return res.status(500).json({ error: e?.message || 'Falha na geração' })
   }
 }

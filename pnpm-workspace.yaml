@@ -1,0 +1,8 @@
+ignoredBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@sentry/cli'
+  - core-js
+  - prisma
+  - sharp
+  - unrs-resolver

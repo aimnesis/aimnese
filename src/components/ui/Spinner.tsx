@@ -4,38 +4,44 @@
 import React from 'react'
 
 export interface SpinnerProps {
-  size?: number // em pixels, padrão 32
-  label?: string // texto para leitores de tela
-  color?: string // cor da borda (ex: '#2563eb' ou 'rgb(...)')
+  /** tamanho em px (padrão 32) */
+  size?: number
+  /** texto para leitores de tela */
+  label?: string
+  /** cor opcional; se não passar, usa currentColor (melhor para theming) */
+  color?: string
   className?: string
 }
 
 const Spinner: React.FC<SpinnerProps> = React.memo(
-  ({ size = 32, label = 'Carregando...', color = '#2563eb', className = '' }) => {
-    const borderWidth = Math.max(2, Math.floor(size / 8)) // proporcional
-    const commonStyles: React.CSSProperties = {
+  ({ size = 32, label = 'Carregando...', color, className = '' }) => {
+    const borderWidth = Math.max(2, Math.floor(size / 8))
+    const chosenColor = color || 'currentColor'
+
+    const styleRing: React.CSSProperties = {
       width: size,
       height: size,
-      borderWidth: borderWidth,
+      borderWidth,
       borderStyle: 'solid',
       borderRadius: '50%',
-      borderColor: color,
+      borderColor: chosenColor,
       borderTopColor: 'transparent',
     }
 
     return (
-      <div
+      <span
         role="status"
         aria-label={label}
         aria-live="polite"
-        className={`inline-block ${className}`}
+        className={`inline-flex items-center ${className}`}
       >
-        <div
-          className="animate-spin"
-          style={commonStyles}
+        <span
+          className="inline-block animate-spin"
+          style={styleRing}
+          aria-hidden="true"
         />
         <span className="sr-only">{label}</span>
-      </div>
+      </span>
     )
   }
 )

@@ -1,61 +1,61 @@
-// prisma/schema.prisma
+// ===========================
+// Prisma Client & Datasource
+// ===========================
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-/* ===========================
-   App + NextAuth (oficial)
-   =========================== */
-model User {
-  id               String         @id @default(cuid())
-  email            String         @unique
-  password         String?
-  firstName        String?
-  lastName         String?
-  name             String?
-  image            String?
-  emailVerified    DateTime?
-
-  // compatibilidade / preenchido a partir do CRM+UF
-  medicalLicenseId String?
-  isVerified       Boolean        @default(false)
-
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-
-  accounts         Account[]
-  sessions         Session[]
-  generatedDocs    GeneratedDoc[]
-  queries          MedicalQuery[]
-  subscriptions    Subscription[]
-
-  // 1:1 com perfil médico
-  doctorProfile    DoctorProfile?
-
-  @@index([email])
+// ===========================
+// Enums
+// ===========================
+enum Role {
+  user
+  admin
 }
 
+enum SubStatus {
+  incomplete
+  incomplete_expired
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+  paused
+}
+
+enum BillingInterval {
+  day
+  week
+  month
+  year
+}
+
+// ===========================
+// NextAuth (compatível c/ PrismaAdapter)
+// ===========================
 model Account {
   id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
 
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -67,7 +67,7 @@ model Session {
   userId       String
   expires      DateTime
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -80,89 +80,210 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-/* ===========================
-   Modelos do app
-   =========================== */
-model MedicalQuery {
-  id               String   @id @default(cuid())
-  userId           String?
-  question         String   @db.Text
-  answer           String   @db.Text
-  sourceReferences Json?
-  queryType        String   @default("evidence")
-  createdAt        DateTime @default(now())
+// ===========================
+// Usuários e perfis
+// ===========================
+model User {
+  id        String  @id @default(cuid())
+  email     String  @unique
+  password  String?
+  name      String?
+  firstName String?
+  lastName  String?
+  image     String?
 
-  user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // dados médicos/opcionais
+  medicalLicenseId String?
+  doctorProfile    DoctorProfile?
 
-  @@index([userId, createdAt])
+  // estado da conta
+  isVerified Boolean @default(false)
+  role       Role    @default(user)
+  blocked    Boolean @default(false)
+
+  // Stripe
+  stripeCustomerId String? @unique
+
+  // metadados
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // relações
+  accounts      Account[]
+  sessions      Session[]
+  queries       Query[]
+  generatedDocs GeneratedDoc[]
+  encounters    Encounter[]
+  subscriptions Subscription[]
+
+  @@index([email])
 }
 
-model Subscription {
+/**
+ * Perfil médico 1:1 com User
+ */
+model DoctorProfile {
   id               String    @id @default(cuid())
-  userId           String
-  provider         String
-  planCode         String
-  status           String
-  currentPeriodEnd DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  userId           String    @unique
+  title            String?
+  cpf              String?   @unique @db.Char(11)
+  crm              String?   @db.VarChar(16)
+  crmUF            String?   @db.Char(2)
+  specialty        String?
+  city             String?
+  stateUF          String?   @db.Char(2)
+  isVerified       Boolean   @default(false)
+  verifiedAt       DateTime?
+  verificationNote String?
+  phone            String?   @db.VarChar(20)
+  whatsapp         String?   @db.VarChar(20)
 
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([userId, status])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([crm, crmUF])
+  @@index([cpf])
+  @@index([crm, crmUF])
 }
 
+// ===========================
+// Conteúdo gerado e consultas
+// ===========================
 model GeneratedDoc {
   id        String   @id @default(cuid())
   userId    String
   kind      String
   inputRef  String?
-  content   String   @db.Text
+  content   String
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
 }
 
-/* ==========================================
-   Perfil Médico — 1:1 com User (cadastro)
-   ========================================== */
-model DoctorProfile {
-  id        String   @id @default(cuid())
+model Query {
+  id               String   @id @default(cuid())
+  userId           String?
+  question         String
+  answer           String?
+  sourceReferences Json?
+  queryType        String   @default("general")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  // relação 1:1
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // básicos do fluxo
-  title     String?                // "Dr." | "Dra." (opcional)
-  cpf       String?   @unique @db.Char(11)  // 11 dígitos (somente números)
-  birthDate DateTime?
+  @@index([userId, createdAt])
+  @@map("MedicalQuery")
+}
 
-  // licença
-  crm       String?   @db.VarChar(16)
-  crmUF     String?   @db.Char(2)          // UF: SP, RJ, ...
-  specialty String?
-
-  // contato (novo)
-  phone     String?   @db.VarChar(20)      // celular (somente dígitos no back)
-  whatsapp  String?   @db.VarChar(20)      // opcional
-
-  // localização (mantido p/ compatibilidade – hoje não exigido)
-  city      String?
-  stateUF   String?   @db.Char(2)
-
-  // verificação
-  isVerified       Boolean   @default(false)
-  verifiedAt       DateTime?
-  verificationNote String?
+// ===========================
+// Encounter / Recording / Prescription
+// ===========================
+model Encounter {
+  id            String  @id @default(cuid())
+  userId        String
+  mode          String
+  specialty     String?
+  title         String?
+  transcriptUrl String?
+  transcriptTxt String? @db.Text
+  report        Json?
+  patientMeta   Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Índices/constraints úteis
-  @@index([cpf])
-  @@index([crm, crmUF])
-  @@unique([crm, crmUF]) // evita CRM duplicado na mesma UF
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prescriptions Prescription[]
+  recordings    Recording[]
+
+  @@index([userId, createdAt])
+}
+
+model Recording {
+  id          String    @id @default(cuid())
+  encounterId String
+  startedAt   DateTime
+  endedAt     DateTime?
+  mime        String
+  bytes       Int
+  url         String
+
+  encounter Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([encounterId, startedAt])
+}
+
+model Prescription {
+  id          String  @id @default(cuid())
+  encounterId String
+  goal        String?
+  patientMeta Json?
+  items       Json
+  pdfUrl      String?
+  sharedTo    Json?
+
+  createdAt DateTime @default(now())
+
+  encounter Encounter @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([encounterId, createdAt])
+}
+
+// ===========================
+// Captação de parceiros (B2B)
+// ===========================
+model PartnerApplication {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  crm       String?
+  company   String?
+  message   String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+// ===========================
+// Stripe (assinaturas)
+// ===========================
+model Subscription {
+  id                 String           @id
+  userId             String
+  customerId         String
+  productId          String?
+  priceId            String?
+  priceAmount        Int?
+  currency           String?          @db.VarChar(8)
+  interval           BillingInterval?
+  status             SubStatus
+  cancelAtPeriodEnd  Boolean          @default(false)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  canceledAt         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([customerId])
+  @@index([priceId])
+}
+
+model StripeEvent {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  type      String
+  data      Json
+  createdAt DateTime @default(now())
 }
