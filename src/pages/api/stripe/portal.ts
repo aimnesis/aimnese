@@ -22,7 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user?.id) return res.status(404).json({ error: 'user-not-found' })
 
   let customerId = user.stripeCustomerId || ''
-
   try {
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -31,10 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         metadata: { app: 'aimnesis', userId: user.id },
       })
       customerId = customer.id
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { stripeCustomerId: customerId },
-      })
+      await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } })
     }
 
     const portal = await stripe.billingPortal.sessions.create({

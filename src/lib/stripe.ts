@@ -1,73 +1,37 @@
 // src/lib/stripe.ts
 import Stripe from 'stripe'
 
-// Fixamos a apiVersion p/ estabilidade de contrato
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  // Alinhado à versão atual da conta Stripe (evita erro de tipo no SDK)
-  apiVersion: '2025-07-30.basil',
-})
+/** URL base do app (com protocolo e sem barra final) */
+function computeAppUrl() {
+  const fromEnv = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (fromEnv) return fromEnv.replace(/\/$/, '')
 
-/** Segredo do webhook (LIVE) */
-export const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || ""
+  const vercel = process.env.VERCEL_URL?.trim() // vem sem protocolo
+  if (vercel) return `https://${vercel.replace(/\/$/, '')}`
 
-/** URL base da app (sem trailing slash) */
-export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.aimnesis.com').replace(/\/$/, '')
+  return 'http://localhost:3000'
+}
+export const APP_URL = computeAppUrl()
 
-/**
- * Mapa de preços por TIER x INTERVALO
- */
+/** Instância do Stripe — usa a apiVersion da conta */
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
+
+/** Segredo do webhook */
+export const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || ''
+
+/** Prices mapeados (inclui DEVPASS) */
 export const STRIPE = {
-  // ---- TIER lógico unificado ----
   PRO: {
-    monthly:
-      process.env.STRIPE_PRICE_ID_PRO_MONTHLY ||
-      process.env.STRIPE_PRICE_ID_UNLIMITED_MONTHLY ||
-      '',
-    yearly:
-      process.env.STRIPE_PRICE_ID_PRO_YEARLY ||
-      process.env.STRIPE_PRICE_ID_UNLIMITED_YEARLY ||
-      '',
+    monthly: process.env.STRIPE_PRICE_ID_PRO_MONTHLY || '',
+    yearly:  process.env.STRIPE_PRICE_ID_PRO_YEARLY  || '',
   },
-
-  // ---- legados (compat) ----
-  P20: {
-    monthly: process.env.STRIPE_PRICE_ID_P20_MONTHLY || '',
-    yearly: process.env.STRIPE_PRICE_ID_P20_YEARLY || '',
-  },
-  P50: {
-    monthly: process.env.STRIPE_PRICE_ID_P50_MONTHLY || '',
-    yearly: process.env.STRIPE_PRICE_ID_P50_YEARLY || '',
-  },
-  SPEC_UNLTD: {
-    monthly: process.env.STRIPE_PRICE_ID_SPEC_UNLTD_MONTHLY || '',
-    yearly: process.env.STRIPE_PRICE_ID_SPEC_UNLTD_YEARLY || '',
-  },
-
-  // ---- atuais (compat) ----
-  P100: {
-    monthly: process.env.STRIPE_PRICE_ID_P100_MONTHLY || '',
-    yearly: process.env.STRIPE_PRICE_ID_P100_YEARLY || '',
-  },
-  P200: {
-    monthly: process.env.STRIPE_PRICE_ID_P200_MONTHLY || '',
-    yearly: process.env.STRIPE_PRICE_ID_P200_YEARLY || '',
-  },
-  UNLIMITED: {
-    monthly: process.env.STRIPE_PRICE_ID_UNLIMITED_MONTHLY || '',
-    yearly: process.env.STRIPE_PRICE_ID_UNLIMITED_YEARLY || '',
-  },
-
-  // DevPass (produção para QA): somente mensal
-  DEVPASS: {
-    monthly: process.env.STRIPE_PRICE_ID_DEVPASS_MONTHLY || '',
-    yearly: '',
-  },
+  DEVPASS: { monthly: process.env.STRIPE_PRICE_ID_DEVPASS_MONTHLY || '', yearly: '' },
 } as const
 
-export type TierKey = keyof typeof STRIPE
 export type IntervalKey = 'monthly' | 'yearly'
+export type TierKey = keyof typeof STRIPE
 
-/** Mapa reverso: priceId -> { tier, interval } */
+/** priceId -> { tier, interval } */
 export const PRICE_LOOKUP: Record<string, { tier: TierKey; interval: IntervalKey }> = Object.fromEntries(
   Object.entries(STRIPE).flatMap(([tier, byInterval]) =>
     Object.entries(byInterval)
@@ -76,57 +40,27 @@ export const PRICE_LOOKUP: Record<string, { tier: TierKey; interval: IntervalKey
   ),
 )
 
-/** Resolve {tier, interval} a partir de um priceId (ou null se desconhecido) */
-export function resolvePrice(priceId?: string | null): { tier: TierKey; interval: IntervalKey } | null {
+/** Resolve localmente; se não achar, tenta API e deduz por nickname/lookup_key */
+export async function resolvePriceWithFallback(priceId?: string | null) {
   if (!priceId) return null
-  const hit = PRICE_LOOKUP[priceId]
-  return hit ?? null
-}
-
-/** Retorna o priceId para um {tier, interval} válido (ou string vazia se faltar env) */
-export function getPriceId(tier: TierKey, interval: IntervalKey): string {
-  return STRIPE[tier]?.[interval] || ''
-}
-
-/** Apenas PRO é obrigatório (monthly OU yearly). DEVPASS é opcional. */
-export function stripePricesConfigured(): boolean {
-  const proOk =
-    !!(STRIPE.PRO?.monthly && STRIPE.PRO.monthly.trim().length > 0) ||
-    !!(STRIPE.PRO?.yearly && STRIPE.PRO.yearly.trim().length > 0)
-  return proOk
-}
-
-/** Verifica se Stripe está pronto (secret + webhook + priceIds PRO). */
-export function assertStripeReady(): {
-  ok: boolean
-  missing: Array<'STRIPE_SECRET_KEY' | 'STRIPE_WEBHOOK_SECRET' | 'PRICE_IDS'>
-} {
-  const missing: Array<'STRIPE_SECRET_KEY' | 'STRIPE_WEBHOOK_SECRET' | 'PRICE_IDS'> = []
-  if (!process.env.STRIPE_SECRET_KEY) missing.push('STRIPE_SECRET_KEY')
-  if (!WEBHOOK_SECRET) missing.push('STRIPE_WEBHOOK_SECRET')
-  if (!stripePricesConfigured()) missing.push('PRICE_IDS')
-  return { ok: missing.length === 0, missing }
-}
-
-/**
- * Fallback: tenta resolver via API do Stripe quando PRICE_LOOKUP não conhece o priceId.
- */
-export async function resolvePriceWithFallback(priceId?: string | null): Promise<{ tier: TierKey; interval: IntervalKey } | null> {
-  const local = resolvePrice(priceId)
+  const local = PRICE_LOOKUP[priceId]
   if (local) return local
-  if (!priceId) return null
   try {
     const price = await stripe.prices.retrieve(priceId)
-    const nickname = (price.nickname || price.lookup_key || '').toString().toUpperCase()
-    const intervalRaw = (price.recurring?.interval ?? null) as 'day' | 'week' | 'month' | 'year' | null
-    const normalized: IntervalKey | null =
-      intervalRaw === 'month' ? 'monthly'
-      : intervalRaw === 'year'  ? 'yearly'
-      : null
+    const nickname = String(price.nickname || price.lookup_key || '').toUpperCase()
+    const interval = price.recurring?.interval as IntervalKey | undefined
     const tier = (Object.keys(STRIPE) as TierKey[]).find((t) => nickname.includes(t)) || null
-    if (tier && normalized) return { tier, interval: normalized }
-    return null
+    return tier && (interval === 'monthly' || interval === 'yearly') ? { tier, interval } : null
   } catch {
     return null
   }
+}
+
+/** Plano lógico a partir do priceId (DEVPASS também libera PRO) */
+export async function planFromPriceId(priceId?: string | null): Promise<'FREE' | 'PRO'> {
+  const r = await resolvePriceWithFallback(priceId)
+  if (!r) return 'FREE'
+  // Tudo que for PRO ou DEVPASS libera PRO na UI
+  if (r.tier === 'PRO' || r.tier === 'DEVPASS') return 'PRO'
+  return 'FREE'
 }

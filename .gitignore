@@ -26,3 +26,7 @@ node_modules/
 .sentryclirc
 EOF
 .vercel
+
+# nunca versionar dumps de env
+env.deploy.funcional
+.env*

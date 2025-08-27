@@ -5,14 +5,12 @@ import { prisma } from '@/lib/prisma'
 
 export const config = { api: { bodyParser: false } }
 
-// Lê o raw body
 async function readRawBody(req: NextApiRequest): Promise<Buffer> {
   const chunks: Uint8Array[] = []
   for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
   return Buffer.concat(chunks)
 }
 
-// Price info do primeiro item
 function readPriceInfo(sub: Stripe.Subscription) {
   const item = sub.items?.data?.[0]
   const price = item?.price
@@ -46,13 +44,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).send(`Webhook Error: ${err?.message || 'invalid'}`)
   }
 
-  // Idempotência (não reprocessar)
+  // idempotência do evento
   try {
     const exists = await prisma.stripeEvent.findUnique({ where: { eventId: event.id } })
     if (exists) return res.status(200).json({ received: true, duplicate: true })
-  } catch {
-    // ignore lookup errors
-  }
+  } catch {}
 
   try {
     switch (event.type) {
@@ -64,7 +60,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           (session.customer_details?.email ||
             (typeof session.customer_email === 'string' ? session.customer_email : '')) || ''
 
-        // Guarda o customerId no usuário (se soubermos quem é pelo email)
         if (email && customerId) {
           const u = await prisma.user.findUnique({ where: { email }, select: { id: true, stripeCustomerId: true } })
           if (u?.id && !u.stripeCustomerId) {
@@ -72,24 +67,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        // Se já houver subscriptionId, persiste/atualiza
         if (subscriptionId && customerId) {
           const sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['items.data.price'] })
           const { unitAmount, interval, priceId, productId, currency } = readPriceInfo(sub)
           const status = sub.status
 
-          const user = await prisma.user.findFirst({
-            where: { stripeCustomerId: customerId },
-            select: { id: true },
-          })
-
+          const user = await prisma.user.findFirst({ where: { stripeCustomerId: customerId }, select: { id: true } })
           if (user?.id) {
             await prisma.subscription.upsert({
               where: { id: sub.id },
               create: {
-                id: sub.id,
-                userId: user.id,
-                customerId,
+                id: sub.id, userId: user.id, customerId,
                 productId: productId ?? undefined,
                 priceId: priceId ?? undefined,
                 priceAmount: unitAmount ?? undefined,
@@ -98,12 +86,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 status: status as any,
                 cancelAtPeriodEnd: !!sub.cancel_at_period_end,
                 currentPeriodStart: unix((sub as any).current_period_start),
-                currentPeriodEnd: unix((sub as any).current_period_end),
+                currentPeriodEnd:   unix((sub as any).current_period_end),
                 canceledAt: (sub as any).canceled_at ? new Date((sub as any).canceled_at * 1000) : null,
               },
               update: {
-                userId: user.id,
-                customerId,
+                userId: user.id, customerId,
                 productId: productId ?? undefined,
                 priceId: priceId ?? undefined,
                 priceAmount: unitAmount ?? undefined,
@@ -112,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 status: status as any,
                 cancelAtPeriodEnd: !!sub.cancel_at_period_end,
                 currentPeriodStart: unix((sub as any).current_period_start),
-                currentPeriodEnd: unix((sub as any).current_period_end),
+                currentPeriodEnd:   unix((sub as any).current_period_end),
                 canceledAt: (sub as any).canceled_at ? new Date((sub as any).canceled_at * 1000) : null,
               },
             })
@@ -128,20 +115,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { unitAmount, interval, priceId, productId, currency } = readPriceInfo(sub)
         const status = sub.status
 
-        const user = await prisma.user.findFirst({
-          where: { stripeCustomerId: customerId },
-          select: { id: true },
-        })
-        if (!user) {
-          console.warn('[stripe:webhook] subscription for unknown customer', { customerId })
-          break
-        }
+        const user = await prisma.user.findFirst({ where: { stripeCustomerId: customerId }, select: { id: true } })
+        if (!user) break
 
         await prisma.subscription.upsert({
           where: { id: sub.id },
           update: {
-            userId: user.id,
-            customerId,
+            userId: user.id, customerId,
             productId: productId ?? undefined,
             priceId: priceId ?? undefined,
             priceAmount: unitAmount ?? undefined,
@@ -150,13 +130,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             status: status as any,
             cancelAtPeriodEnd: !!sub.cancel_at_period_end,
             currentPeriodStart: unix((sub as any).current_period_start),
-            currentPeriodEnd: unix((sub as any).current_period_end),
+            currentPeriodEnd:   unix((sub as any).current_period_end),
             canceledAt: (sub as any).canceled_at ? new Date((sub as any).canceled_at * 1000) : null,
           },
           create: {
-            id: sub.id,
-            userId: user.id,
-            customerId,
+            id: sub.id, userId: user.id, customerId,
             productId: productId ?? undefined,
             priceId: priceId ?? undefined,
             priceAmount: unitAmount ?? undefined,
@@ -165,7 +143,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             status: status as any,
             cancelAtPeriodEnd: !!sub.cancel_at_period_end,
             currentPeriodStart: unix((sub as any).current_period_start),
-            currentPeriodEnd: unix((sub as any).current_period_end),
+            currentPeriodEnd:   unix((sub as any).current_period_end),
             canceledAt: (sub as any).canceled_at ? new Date((sub as any).canceled_at * 1000) : null,
           },
         })
@@ -186,16 +164,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       default:
-        // outros eventos ignorados por enquanto
+        // ignorar outros por enquanto
         break
     }
 
-    // Audita e garante idempotência futura
-    try {
-      await prisma.stripeEvent.create({
-        data: { eventId: event.id, type: event.type, data: event as any },
-      })
-    } catch {}
+    try { await prisma.stripeEvent.create({ data: { eventId: event.id, type: event.type, data: event as any } }) } catch {}
 
     return res.status(200).json({ received: true })
   } catch (err) {

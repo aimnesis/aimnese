@@ -1,9 +1,10 @@
+// src/pages/api/stripe/subscription.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getServerSession } from 'next-auth'
 import type { Session } from 'next-auth'
 import { authOptions } from '@/server/auth'
 import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
+import { stripe, planFromPriceId } from '@/lib/stripe'
 import type Stripe from 'stripe'
 
 type Interval = 'day' | 'week' | 'month' | 'year' | null
@@ -20,13 +21,6 @@ type SubView = {
   currency?: string | null
   priceAmount?: number | null
   source: 'db' | 'stripe'
-}
-
-function planFromPrice(priceId?: string | null): Plan {
-  const m = process.env.STRIPE_PRICE_ID_PRO_MONTHLY
-  const y = process.env.STRIPE_PRICE_ID_PRO_YEARLY
-  if (priceId && (priceId === m || priceId === y)) return 'PRO'
-  return 'FREE'
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -51,10 +45,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     orderBy: { updatedAt: 'desc' },
   })
   if (local) {
+    const plan = await planFromPriceId(local.priceId ?? null)
     const view: SubView = {
       id: local.id,
       status: local.status,
-      plan: planFromPrice(local.priceId ?? null),
+      plan,
       interval: (local.interval as any) ?? null,
       currentPeriodEnd: local.currentPeriodEnd?.toISOString() ?? null,
       priceId: local.priceId ?? null,
@@ -73,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const subs: Stripe.ApiList<Stripe.Subscription> = await stripe.subscriptions.list({
       customer: user.stripeCustomerId,
       status: 'all',
-      expand: ['data.items.data.price'],
+      expand: ['data.items.data.price', 'data.items.data.price.product'],
       limit: 1,
     })
     const sub = subs.data[0]
@@ -82,14 +77,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const item = sub.items.data[0]
     const interval = (item?.price?.recurring?.interval ?? null) as Interval
     const priceId = item?.price?.id ?? null
+    const plan = await planFromPriceId(priceId)
+
     const view: SubView = {
       id: sub.id,
       status: sub.status,
-      plan: planFromPrice(priceId),
+      plan,
       interval,
-      currentPeriodEnd: (sub as any).current_period_end
-        ? new Date((sub as any).current_period_end * 1000).toISOString()
-        : null,
+      currentPeriodEnd: (sub as any).current_period_end ? new Date((sub as any).current_period_end * 1000).toISOString() : null,
       priceId,
       productId: (item?.price?.product as string) ?? null,
       currency: item?.price?.currency?.toUpperCase?.() ?? null,
